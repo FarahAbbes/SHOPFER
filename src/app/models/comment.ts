@@ -6,4 +6,3 @@ export interface Comment {
     rating: number;
     createdAt: Date;
   }
-  

@@ -20,7 +20,6 @@ export class AuthService {
   toggleAuth(): void {
     this.authenticatedSubject.next(!this.authenticatedSubject.value); // Toggle the current value
   }
-
   // Optional: method to get current authentication state
   getAuthState(): boolean {
     return this.authenticatedSubject.value; // Get current authentication state

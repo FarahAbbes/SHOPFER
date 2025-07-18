@@ -24,7 +24,6 @@ export class CommandeService {
       dateCommande: new Date().toISOString(),
       details: plainDetails // Use transformed details
     };
-
     // Code for Firestore
     const collectionInstance = collection(this.fs, 'commandes');
     addDoc(collectionInstance, commandeData)
