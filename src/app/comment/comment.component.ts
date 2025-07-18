@@ -12,7 +12,7 @@ import { AuthService } from '../services/auth.service';
   standalone: true,
   imports: [CommonModule, DatePipe, ReactiveFormsModule],
   templateUrl: './comment.component.html',
-  // styleUrls: ['./comment.component.css'], // Fix typo from styleUrl to styleUrls
+  // styleUrls: ['./comment.component.css'], // si besoin
   encapsulation: ViewEncapsulation.None
 })
 export class CommentComponent implements OnInit, OnDestroy {
@@ -36,20 +36,19 @@ export class CommentComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    if (this.productId) {
-      this.loadComments(); // Load comments when productId is available
-      
-      // Subscribe to the comments observable after productId is set
-      this.commentsSubscription = this.commentService.comments$.subscribe(comments => {
-        console.log('Comments from service:', comments); // Log all comments
-        this.comments = this.commentService.getCommentsByProductId(this.productId);
-        console.log('Filtered comments:', this.comments); // Log filtered comments
+    if (this.productId != null) {
+      // Souscription aux commentaires
+      this.commentsSubscription = this.commentService.comments$.subscribe(allComments => {
+        console.log('Comments from service:', allComments);
+        if (allComments && Array.isArray(allComments)) {
+          // Filtrer les commentaires pour ce produit uniquement
+          this.comments = allComments.filter(c => c.productId === this.productId);
+        } else {
+          this.comments = [];
+        }
+        console.log('Filtered comments:', this.comments);
       });
     }
-  }
-
-  loadComments(): void {
-    this.comments = this.commentService.getCommentsByProductId(this.productId);
   }
 
   openReviewForm() {
@@ -61,32 +60,29 @@ export class CommentComponent implements OnInit, OnDestroy {
   }
 
   onStarClick(star: number): void {
-    this.reviewForm.get('rating')?.setValue(star); // Update the rating in the form
+    this.reviewForm.get('rating')?.setValue(star);
   }
 
   submitForm() {
-    const isAuthenticated = this.as.getAuthState(); // Check if the user is authenticated
-    if (isAuthenticated) {
+    if (this.as.getAuthState()) {
       const newComment: Comment = {
-        id: this.comments.length + 1, // Handle ID generation properly if needed
+        id: this.comments.length + 1, // À gérer selon ta logique réelle
         productId: this.productId,
-        userName: this.as.currentUserSig()!.userName, // Get the username from your AuthService
+        userName: this.as.currentUserSig()?.userName ?? 'anonymous',
         comment: this.reviewForm.get('comment')?.value,
         rating: this.reviewForm.get('rating')?.value,
-        createdAt: new Date() // Use the current date
+        createdAt: new Date()
       };
 
-      this.commentService.addComment(newComment); // Use the method to add the comment
-      this.reviewForm.reset(); // Reset the form after submission
-      this.showReviewForm = false; // Optionally hide the review form
+      this.commentService.addComment(newComment);
+      this.reviewForm.reset({ rating: null, comment: null }); // reset proprement
+      this.showReviewForm = false;
     } else {
-      this.router.navigate(['/login']); // Redirect to login if not authenticated
+      this.router.navigate(['/login']);
     }
   }
 
   ngOnDestroy(): void {
-    if (this.commentsSubscription) {
-      this.commentsSubscription.unsubscribe();
-    }
+    this.commentsSubscription?.unsubscribe();
   }
 }

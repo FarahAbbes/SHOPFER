@@ -49,3 +49,4 @@ sonar-project.properties
 
 # Ignore test coverage reports
 coverage/
+.scannerwork/

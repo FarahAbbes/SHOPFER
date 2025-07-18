@@ -2,5 +2,10 @@ projectKey=E-commerce-App-main
 serverUrl=http://localhost:9000
 serverVersion=25.7.0.110598
 dashboardUrl=http://localhost:9000/dashboard?id=E-commerce-App-main
+<<<<<<< HEAD
 ceTaskId=2c26b372-8145-4a76-af67-018d776811f6
 ceTaskUrl=http://localhost:9000/api/ce/task?id=2c26b372-8145-4a76-af67-018d776811f6
+=======
+ceTaskId=d13f8876-d945-4f35-a551-89f069207646
+ceTaskUrl=http://localhost:9000/api/ce/task?id=d13f8876-d945-4f35-a551-89f069207646
+>>>>>>> a01f2cfd9fd107d05c1615ef4a49b3441aaee132

@@ -27,7 +27,7 @@ export class CartService {
     private readonly cmdSrv: CommandeService,
     private readonly authSrv: AuthService,
     private readonly router : Router,
-    @Inject(PLATFORM_ID) platformId: object              // <-- NEW
+    @Inject(PLATFORM_ID) platformId: object
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
     this.restoreCart();
@@ -52,9 +52,17 @@ export class CartService {
 
   /* ---------- Cart mutations ---------- */
   addToCart(item: CartItem): void {
-    const list = [...this.cartDetails$.value];                       // clone
+    const list = [...this.cartDetails$.value]; // clone current cart items
     const found = list.find(c => c.product.id === item.product.id);
-    found ? (found.qte += item.qte) : list.push(item);
+
+    if (found) {
+      // Increment quantity if item found
+      found.qte += item.qte;
+    } else {
+      // Otherwise, add new item to list
+      list.push(item);
+    }
+
     this.cartDetails$.next(list);
     this.persistCart();
   }
@@ -63,7 +71,11 @@ export class CartService {
     const list = [...this.cartDetails$.value];
     const idx  = list.findIndex(c => c.product.id === item.product.id);
     if (idx !== -1) {
-      list[idx].qte > 1 ? list[idx].qte-- : list.splice(idx, 1);
+      if (list[idx].qte > 1) {
+        list[idx].qte--;
+      } else {
+        list.splice(idx, 1);
+      }
       this.cartDetails$.next(list);
       this.persistCart();
     }
@@ -77,7 +89,7 @@ export class CartService {
   /* ---------- Business helpers ---------- */
   getTotal(): number {
     return this.cartDetails$.value
-      .reduce((t, it) => t + it.product.price * it.qte, 0);
+      .reduce((total, item) => total + item.product.price * item.qte, 0);
   }
 
   /* ---------- Checkout ---------- */

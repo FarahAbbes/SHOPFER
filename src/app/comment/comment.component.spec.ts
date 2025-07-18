@@ -15,22 +15,8 @@ describe('CommentComponent', () => {
   let routerSpy: jasmine.SpyObj<Router>;
 
   const mockComments: Comment[] = [
-    {
-      id: 1,
-      productId: 1,
-      userName: 'user1',
-      comment: 'Nice product!',
-      rating: 5,
-      createdAt: new Date()
-    },
-    {
-      id: 2,
-      productId: 2,
-      userName: 'user2',
-      comment: 'Could be better.',
-      rating: 3,
-      createdAt: new Date()
-    }
+    { id: 1, productId: 1, userName: 'user1', comment: 'Nice product!', rating: 5, createdAt: new Date() },
+    { id: 2, productId: 2, userName: 'user2', comment: 'Could be better.', rating: 3, createdAt: new Date() }
   ];
 
   const mockUser = {
@@ -38,13 +24,10 @@ describe('CommentComponent', () => {
     userName: 'testUser',
     email: 'test@example.com',
     role: 'user'
-  }; // Ajout des propriétés manquantes selon ton modèle
+  };
 
   beforeEach(async () => {
-    commentServiceSpy = jasmine.createSpyObj('CommentService', [
-      'getCommentsByProductId',
-      'addComment'
-    ], {
+    commentServiceSpy = jasmine.createSpyObj('CommentService', ['getCommentsByProductId', 'addComment'], {
       comments$: of(mockComments)
     });
 
@@ -71,10 +54,7 @@ describe('CommentComponent', () => {
   });
 
   it('should load and filter comments on init', () => {
-    commentServiceSpy.getCommentsByProductId.and.returnValue([mockComments[0]]);
-    fixture.detectChanges(); // triggers ngOnInit
-
-    expect(commentServiceSpy.getCommentsByProductId).toHaveBeenCalledWith(1);
+    fixture.detectChanges(); // déclenche ngOnInit et subscription
     expect(component.comments.length).toBe(1);
     expect(component.comments[0].productId).toBe(1);
   });
@@ -100,8 +80,8 @@ describe('CommentComponent', () => {
     authServiceSpy.getAuthState.and.returnValue(true);
     authServiceSpy.currentUserSig.and.returnValue(mockUser);
     component.reviewForm.setValue({ comment: 'Great!', rating: 5 });
+    component.comments = []; // simuler état avant ajout
 
-    component.comments = []; // simulate empty state before
     component.submitForm();
 
     expect(commentServiceSpy.addComment).toHaveBeenCalledWith(jasmine.objectContaining({
@@ -112,8 +92,8 @@ describe('CommentComponent', () => {
     }));
 
     expect(component.showReviewForm).toBeFalse();
-    expect(component.reviewForm.get('comment')?.value).toBeNull(); // form reset
-    expect(component.reviewForm.get('rating')?.value).toBeNull(); // also reset
+    expect(component.reviewForm.get('comment')?.value).toBeNull();
+    expect(component.reviewForm.get('rating')?.value).toBeNull();
   });
 
   it('should redirect to login if not authenticated on submit', () => {
@@ -123,8 +103,8 @@ describe('CommentComponent', () => {
   });
 
   it('should unsubscribe from comments$ on destroy', () => {
-    fixture.detectChanges(); // triggers ngOnInit
-    spyOn(component['commentsSubscription'], 'unsubscribe');
+    fixture.detectChanges();
+    spyOn(component['commentsSubscription'], 'unsubscribe').and.callThrough();
     component.ngOnDestroy();
     expect(component['commentsSubscription'].unsubscribe).toHaveBeenCalled();
   });
