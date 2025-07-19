@@ -2,53 +2,84 @@ trigger:
 - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Default'  # Self-hosted agent pool
 
 variables:
   CI: 'true'
 
 steps:
-# 1. Installer Node.js
+# 1. Install Node.js
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'
   displayName: 'Install Node.js'
 
-# 2. Installer Angular CLI globalement
+# 2. Install Angular CLI globally
 - script: |
     npm install -g @angular/cli
   displayName: 'Install Angular CLI'
 
-# 3. Installer les dépendances du projet
+# 3. Install project dependencies
 - script: |
     npm install
   displayName: 'Install dependencies'
 
-# 4. Lancer les tests unitaires avec Karma/Jasmine
+# 4. Build the project first (recommended before testing)
 - script: |
-    ng test --karma-config karma.conf.js --watch=false --code-coverage
+    ng build --configuration=production
+  displayName: 'Build Angular App'
+
+# 5. Run unit tests with Karma/Jasmine
+- script: |
+    ng test --karma-config=karma.conf.js --watch=false --code-coverage --browsers=ChromeHeadless
   displayName: 'Run Unit Tests with Karma'
 
-# 5. Publier les résultats de couverture de code
+# 6. Publish test results (if you have test results in JUnit format)
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '**/TESTS-*.xml'
+    searchFolder: '$(Agent.TempDirectory)'
+    testRunTitle: 'Unit Tests'
+  displayName: 'Publish Unit Test Results'
+
+# 7. Publish code coverage results
 - task: PublishCodeCoverageResults@1
+  condition: succeededOrFailed()
   inputs:
     codeCoverageTool: 'Cobertura'
     summaryFileLocation: 'coverage/**/cobertura-coverage.xml'
     reportDirectory: 'coverage'
   displayName: 'Publish Code Coverage'
 
-# 6. Lancer les tests E2E avec Robot Framework (si script dispo)
+# 8. Install Python and Robot Framework (only if robot-tests directory exists)
 - script: |
-    pip install robotframework selenium
-    robot tests/
-  workingDirectory: 'robot-tests'  # adapte ce chemin à ta structure
-  displayName: 'Run Robot Framework Tests'
+    if [ -d "robot-tests" ]; then
+      echo "Robot tests directory found, installing dependencies..."
+      pip install robotframework selenium robotframework-seleniumlibrary
+    else
+      echo "No robot-tests directory found, skipping Robot Framework installation"
+    fi
+  displayName: 'Install Robot Framework (conditional)'
 
-# 7. Publier les résultats des tests Robot
+# 9. Run Robot Framework tests (only if directory exists)
+- script: |
+    if [ -d "robot-tests" ]; then
+      echo "Running Robot Framework tests..."
+      cd robot-tests
+      robot --outputdir results tests/
+    else
+      echo "No robot-tests directory found, skipping E2E tests"
+    fi
+  displayName: 'Run Robot Framework Tests (conditional)'
+
+# 10. Publish Robot Framework test results (only if they exist)
 - task: PublishTestResults@2
-  condition: succeededOrFailed()
+  condition: and(succeededOrFailed(), exists('robot-tests/results/output.xml'))
   inputs:
-    testResultsFormat: 'JUnit'
+    testResultsFormat: 'RobotFramework'
     testResultsFiles: '**/output.xml'
-    searchFolder: 'robot-tests'
-    testRunTitle: 'Robot Framework Tests'
+    searchFolder: 'robot-tests/results'
+    testRunTitle: 'Robot Framework E2E Tests'
+  displayName: 'Publish Robot Test Results'
