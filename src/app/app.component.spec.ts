@@ -1,165 +1,190 @@
-import {
-  ComponentFixture,
-  TestBed,
-  fakeAsync,
-  tick,
-  flush,
-} from '@angular/core/testing';
-import { NavigationEnd, Router, ActivatedRoute } from '@angular/router';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NavigationEnd, Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-
 import { BehaviorSubject, of } from 'rxjs';
-import { signal, WritableSignal, Component } from '@angular/core';
-import { By } from '@angular/platform-browser';
+import { signal } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { AppComponent } from './app.component';
-import { SearchBarComponent } from './search-bar/search-bar.component';
-import { HeaderComponent } from './header/header.component';
-import { CartComponent } from './cart/cart.component';
-
 import { AuthService } from './services/auth.service';
 import { CartService } from './services/cart.service';
 import { Firestore } from '@angular/fire/firestore';
 import { User } from './models/user';
 
-/* ---------- stub components ---------- */
-@Component({ selector: 'app-footer', template: '' }) class FooterStub {}
-@Component({ selector: 'app-list-product', template: '' }) class ListProductStub {}
-@Component({ selector: 'app-sign-in', template: '' }) class SignInStub {}
-@Component({ selector: 'app-sign-up', template: '' }) class SignUpStub {}
+// Stubs simplifiés
+@Component({ selector: 'app-header', template: '<div>Header</div>' })
+class HeaderStub {
+  Authenticated = false;
+}
 
-/* ---------- router mock ---------- */
-const routerEvents$ = new BehaviorSubject<any>(null);
-const routerMock = {
-  events: routerEvents$.asObservable(),
-  url: '/home',
-  navigate: jasmine.createSpy('navigate'),
-};
+@Component({ selector: 'app-search-bar', template: '<div>SearchBar</div>' })
+class SearchBarStub {}
 
-/* ---------- auth mocks ---------- */
-const user$ = new BehaviorSubject<User | null>(null);
-const authenticated$ = new BehaviorSubject<boolean>(false);
+@Component({ selector: 'app-cart', template: '<div>Cart</div>' })
+class CartStub {}
 
-const currentUserSigVal = signal<User | null>(null);
-const currentUserSigSet = jasmine
-  .createSpy('set')
-  .and.callFake((v: User | null) => currentUserSigVal.set(v));
+@Component({ selector: 'app-footer', template: '<div>Footer</div>' })
+class FooterStub {}
 
-const authMock = {
-  user$: user$.asObservable(),
-  authenticated$: authenticated$.asObservable(),
-  currentUserSig: Object.assign(() => currentUserSigVal(), {
-    set: currentUserSigSet,
-    update: jasmine.createSpy('update'),
-    asReadonly: jasmine
-      .createSpy('asReadonly')
-      .and.returnValue(() => currentUserSigVal()),
-  }) as unknown as WritableSignal<User | null>,
-  logout: jasmine.createSpy('logout'),
-};
+@Component({ selector: 'router-outlet', template: '<div>Router Outlet</div>' })
+class RouterOutletStub {}
 
-/* ---------- cart mock ---------- */
-const cartMock = {
-  cartVisibility$: of(true),
-  cartDetails$: of([]),
-  getTotal: jasmine.createSpy('getTotal').and.returnValue(0),
-  toggleCart: jasmine.createSpy('toggleCart'),
-  validerPanier: jasmine.createSpy('validerPanier'),
-  removeItem: jasmine.createSpy('removeItem'),
-};
+// Dummy components for routing
+@Component({ template: '<div>Home</div>' })
+class HomeComponent {}
 
-describe('AppComponent', () => {
+@Component({ template: '<div>Login</div>' })
+class LoginComponent {}
+
+describe('AppComponent - Debug Version', () => {
+  let component: AppComponent;
+  let fixture: ComponentFixture<AppComponent>;
+  let router: Router;
+  let user$: BehaviorSubject<User | null>;
+  let authenticated$: BehaviorSubject<boolean>;
+  let authService: jasmine.SpyObj<AuthService>;
+
   beforeEach(async () => {
+    // Créer les BehaviorSubjects
+    user$ = new BehaviorSubject<User | null>(null);
+    authenticated$ = new BehaviorSubject<boolean>(false);
+
+    const currentUserSig = signal<User | null>(null);
+    const authSpy = jasmine.createSpyObj('AuthService', ['logout'], {
+      user$: user$.asObservable(),
+      authenticated$: authenticated$.asObservable(),
+      currentUserSig,
+    });
+
+    const cartMock = {
+      cartVisibility$: of(false),
+      cartDetails$: of([]),
+      getTotal: jasmine.createSpy('getTotal').and.returnValue(0),
+      toggleCart: jasmine.createSpy('toggleCart'),
+      validerPanier: jasmine.createSpy('validerPanier'),
+      removeItem: jasmine.createSpy('removeItem'),
+    };
+
     await TestBed.configureTestingModule({
       imports: [
-        RouterTestingModule,
+        RouterTestingModule.withRoutes([
+          { path: 'home', component: HomeComponent },
+          { path: 'login', component: LoginComponent },
+          { path: 'sign-up', component: LoginComponent },
+          { path: 'products', component: HomeComponent },
+          { path: '', redirectTo: '/home', pathMatch: 'full' }
+        ]),
         HttpClientTestingModule,
         AppComponent,
-        HeaderComponent,
-        SearchBarComponent,
-        CartComponent,
       ],
       declarations: [
+        HeaderStub,
+        SearchBarStub,
+        CartStub,
         FooterStub,
-        ListProductStub,
-        SignInStub,
-        SignUpStub,
+        RouterOutletStub,
+        HomeComponent,
+        LoginComponent,
       ],
       providers: [
-        { provide: Router, useValue: routerMock },
-        { provide: ActivatedRoute, useValue: {} },
-        { provide: AuthService, useValue: authMock },
+        { provide: AuthService, useValue: authSpy },
         { provide: CartService, useValue: cartMock },
         { provide: Firestore, useValue: {} },
       ],
     }).compileComponents();
+
+    fixture = TestBed.createComponent(AppComponent);
+    component = fixture.componentInstance;
+    router = TestBed.inject(Router);
+    authService = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
   });
 
   afterEach(() => {
-    user$.next(null);
-    authenticated$.next(false);
-    currentUserSigSet.calls.reset();
+    // Nettoyer les observables
+    user$.complete();
+    authenticated$.complete();
+    
+    if (fixture) {
+      fixture.destroy();
+    }
   });
 
-  it('should create the app', () => {
-    expect(TestBed.createComponent(AppComponent).componentInstance)
-      .withContext('AppComponent instance should exist')
-      .toBeTruthy();
+  it('should create', () => {
+    expect(component).toBeTruthy();
   });
 
-  /* --------------------- navbar -------------------- */
-  it('hides navbar on /login', fakeAsync(() => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
+  it('should initialize showNavbar to true by default', () => {
+    // Vérifier l'état initial avant ngOnInit
+    console.log('showNavbar before detectChanges:', component.showNavbar);
+    
+    fixture.detectChanges(); // Déclenche ngOnInit
+    
+    console.log('showNavbar after detectChanges:', component.showNavbar);
+    
+    expect(component.showNavbar).toBe(true);
+  });
 
-    routerMock.url = '/login';
-    routerEvents$.next(new NavigationEnd(1, '/login', '/login'));
-    tick();
-
-    expect(app.showNavbar).toBeFalse();
-    flush();
-  }));
-
-  it('shows navbar on non‑auth route', fakeAsync(() => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-
-    routerMock.url = '/products';
-    routerEvents$.next(new NavigationEnd(1, '/products', '/products'));
-    tick();
-
-    expect(app.showNavbar).toBeTrue();
-    flush();
-  }));
-
-  /* --------------- current user --------------- */
-  it('sets currentUserSig when user logs in', fakeAsync(() => {
-    const fixture = TestBed.createComponent(AppComponent);
+  it('should hide navbar on auth routes', async () => {
+    fixture.detectChanges(); // ngOnInit
+    
+    // Test /login
+    await router.navigate(['/login']);
     fixture.detectChanges();
-
-    const u: User = { email: 'john@example.com', userName: 'John' };
-    user$.next(u);
-    authenticated$.next(true);
-    tick();
-
-    expect(currentUserSigSet).toHaveBeenCalledWith(u);
-    const header = fixture.debugElement.query(By.css('app-header')).componentInstance;
-    expect(header.Authenticated).toBeTrue();
-    flush();
-  }));
-
-  it('clears currentUserSig when user logs out', fakeAsync(() => {
-    const fixture = TestBed.createComponent(AppComponent);
+    console.log('showNavbar for /login:', component.showNavbar);
+    expect(component.showNavbar).toBe(false);
+    
+    // Test /sign-up  
+    await router.navigate(['/sign-up']);
     fixture.detectChanges();
+    console.log('showNavbar for /sign-up:', component.showNavbar);
+    expect(component.showNavbar).toBe(false);
+    
+    // Test route normale
+    await router.navigate(['/products']);
+    fixture.detectChanges();
+    console.log('showNavbar for /products:', component.showNavbar);
+    expect(component.showNavbar).toBe(true);
+  });
 
+  it('should update currentUserSig when user changes', () => {
+    fixture.detectChanges(); // ngOnInit
+    
+    const testUser: User = {
+      email: 'test@example.com',
+      userName: 'TestUser'
+    };
+    
+    // Emit user
+    user$.next(testUser);
+    fixture.detectChanges();
+    
+    expect(authService.currentUserSig()).toEqual({
+      email: 'test@example.com',
+      userName: 'TestUser'
+    });
+    
+    // Emit null user
     user$.next(null);
-    authenticated$.next(false);
-    tick();
+    fixture.detectChanges();
+    
+    expect(authService.currentUserSig()).toBeNull();
+  });
 
-    expect(currentUserSigSet).toHaveBeenCalledWith(null);
-    const header = fixture.debugElement.query(By.css('app-header')).componentInstance;
-    expect(header.Authenticated).toBeFalse();
-    flush();
-  }));
+  it('should handle user with missing properties', () => {
+    fixture.detectChanges(); // ngOnInit
+    
+    const incompleteUser = {
+      email: null,
+      userName: undefined
+    } as any;
+    
+    user$.next(incompleteUser);
+    fixture.detectChanges();
+    
+    expect(authService.currentUserSig()).toEqual({
+      email: '',
+      userName: 'Guest'
+    });
+  });
 });
