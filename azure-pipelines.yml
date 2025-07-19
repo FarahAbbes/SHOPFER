@@ -1,22 +1,54 @@
-# Node.js with Angular
-# Build a Node.js project that uses Angular.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
-
 trigger:
 - main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
+
+variables:
+  CI: 'true'
 
 steps:
+# 1. Installer Node.js
 - task: NodeTool@0
   inputs:
-    versionSpec: '20.x'
+    versionSpec: '18.x'
   displayName: 'Install Node.js'
 
+# 2. Installer Angular CLI globalement
 - script: |
     npm install -g @angular/cli
+  displayName: 'Install Angular CLI'
+
+# 3. Installer les dépendances du projet
+- script: |
     npm install
-    ng build --prod
-  displayName: 'npm install and build'
+  displayName: 'Install dependencies'
+
+# 4. Lancer les tests unitaires avec Karma/Jasmine
+- script: |
+    ng test --watch=false --browsers=ChromeHeadless --code-coverage
+  displayName: 'Run Unit Tests with Karma'
+
+# 5. Publier les résultats de couverture de code
+- task: PublishCodeCoverageResults@1
+  inputs:
+    codeCoverageTool: 'Cobertura'
+    summaryFileLocation: 'coverage/**/cobertura-coverage.xml'
+    reportDirectory: 'coverage'
+  displayName: 'Publish Code Coverage'
+
+# 6. Lancer les tests E2E avec Robot Framework (si script dispo)
+- script: |
+    pip install robotframework selenium
+    robot tests/
+  workingDirectory: 'robot-tests'  # adapte ce chemin à ta structure
+  displayName: 'Run Robot Framework Tests'
+
+# 7. Publier les résultats des tests Robot
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '**/output.xml'
+    searchFolder: 'robot-tests'
+    testRunTitle: 'Robot Framework Tests'
