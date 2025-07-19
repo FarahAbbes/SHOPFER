@@ -11,7 +11,11 @@ module.exports = function (config) {
       require('@angular-devkit/build-angular/plugins/karma')
     ],
     client: {
-      clearContext: false // leave Jasmine Spec Runner output visible in browser
+      clearContext: false, // leave Jasmine Spec Runner output visible in browser
+      jasmine: {
+        random: false, // Désactive l'ordre aléatoire pour plus de stabilité
+        stopOnFailure: false
+      }
     },
     coverageReporter: {
       dir: require('path').join(__dirname, './coverage'),
@@ -19,9 +23,9 @@ module.exports = function (config) {
       reporters: [
         { type: 'lcovonly', subdir: '.', file: 'lcov.info' },
         { type: 'text-summary' },
-        { type: 'html' }
+        { type: 'html' },
+        { type: 'cobertura' } // ✅ Ajouté pour Azure DevOps
       ],
-      // ✅ Add this exclude to remove it from the report entirely
       exclude: [
         'src/assets/js/script.js'
       ],
@@ -42,8 +46,29 @@ module.exports = function (config) {
     colors: true,
     logLevel: config.LOG_INFO,
     autoWatch: true,
-    browsers: ['Chrome'],
-    singleRun: false,
-    restartOnFileChange: true
+    // ✅ Configuration pour CI/CD
+    browsers: process.env.CI ? ['ChromeHeadless'] : ['Chrome'],
+    singleRun: process.env.CI ? true : false,
+    restartOnFileChange: true,
+    
+    // ✅ Configuration spéciale pour ChromeHeadless en CI
+    customLaunchers: {
+      ChromeHeadless: {
+        base: 'Chrome',
+        flags: [
+          '--no-sandbox',
+          '--disable-web-security',
+          '--disable-gpu',
+          '--remote-debugging-port=9222',
+          '--headless'
+        ]
+      }
+    },
+    
+    // ✅ Augmente les timeouts pour éviter les erreurs de timer
+    browserNoActivityTimeout: 60000,
+    browserDisconnectTimeout: 10000,
+    browserDisconnectTolerance: 3,
+    captureTimeout: 60000
   });
 };
