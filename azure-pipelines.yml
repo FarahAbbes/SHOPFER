@@ -2,39 +2,39 @@ trigger:
   - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'  # Agent Microsoft-hosted (pas besoin d’installer quoi que ce soit)
 
 variables:
-  SONAR_TOKEN: $(SonarQubeToken)  # À définir comme variable secrète dans Azure DevOps
+  CI: 'true'
+  SONAR_TOKEN: $(SonarQubeToken)  # À configurer comme variable secrète dans Azure DevOps
 
 steps:
-
-# Étape 1 : Installer Node.js
+# 1. Installer Node.js
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'
   displayName: 'Install Node.js'
 
-# Étape 2 : Installer Angular CLI et les dépendances
+# 2. Installer Angular CLI + dépendances
 - script: |
     npm install -g @angular/cli
     npm install
-  displayName: 'Install Angular dependencies'
+  displayName: 'Install Angular & dependencies'
 
-# Étape 3 : Build Angular
+# 3. Build Angular
 - script: |
-    ng build --configuration production
+    ng build --configuration=production
   displayName: 'Build Angular App'
 
-# Étape 4 : Lancer les tests unitaires
+# 4. Lancer les tests unitaires
 - script: |
-    ng test --watch=false --browsers=ChromeHeadless --code-coverage
-  displayName: 'Run Unit Tests (Karma + Jasmine)'
+    ng test --karma-config=karma.conf.js --watch=false --code-coverage --browsers=ChromeHeadless
+  displayName: 'Run Unit Tests'
 
-# Étape 5 : Préparer l’analyse SonarQube
+# 5. Analyse SonarQube (préparation)
 - task: SonarQubePrepare@5
   inputs:
-    SonarQube: 'SonarQubeServiceConnection'  # Configure ce service dans Azure DevOps
+    SonarQube: 'SonarQubeServiceConnection'  # Crée ce service dans Azure DevOps
     scannerMode: 'CLI'
     configMode: 'manual'
     cliProjectKey: 'E-commerce-App-main'
@@ -50,29 +50,39 @@ steps:
       sonar.typescript.lcov.reportPaths=coverage/lcov.info
       sonar.exclusions=**/assets/js/script.js,**/node_modules/**,**/dist/**,**/build/**
 
-# Étape 6 : Analyse SonarQube
+# 6. Exécuter l'analyse SonarQube
 - task: SonarQubeAnalyze@5
   displayName: 'Run SonarQube Analysis'
 
-# Étape 7 : Publier les résultats SonarQube
+# 7. Publier les résultats SonarQube
 - task: SonarQubePublish@5
   inputs:
     pollingTimeoutSec: '300'
   displayName: 'Publish SonarQube Results'
 
-# Étape 8 : Installer Python + Robot Framework + Selenium
+# 8. Installer Python + Robot Framework
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.x'
     addToPath: true
-  displayName: 'Use Python 3.x'
+  displayName: 'Use Python 3'
 
 - script: |
-    python -m pip install --upgrade pip
-    pip install robotframework selenium
+    pip install --upgrade pip
+    pip install robotframework selenium robotframework-seleniumlibrary
   displayName: 'Install Robot Framework & Selenium'
 
-# Étape 9 : Exécuter les tests end-to-end
+# 9. Lancer les tests Robot Framework
 - script: |
-    robot tests/  # Modifie si ton répertoire de tests a un autre nom
+    cd robot-tests
+    robot --outputdir results tests/
   displayName: 'Run Robot Framework Tests'
+
+# 10. Publier les résultats de Robot Framework
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'RobotFramework'
+    testResultsFiles: '**/output.xml'
+    searchFolder: 'robot-tests/results'
+    testRunTitle: 'Robot Framework E2E Tests'
+  displayName: 'Publish Robot Test Results'
