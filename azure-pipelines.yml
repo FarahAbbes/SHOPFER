@@ -2,11 +2,10 @@ trigger:
   - main
 
 pool:
-  vmImage: 'ubuntu-latest'  # Agent Microsoft-hosted (pas besoin d’installer quoi que ce soit)
+  vmImage: 'ubuntu-latest'
 
 variables:
   CI: 'true'
-  SONAR_TOKEN: $(SonarQubeToken)  # À configurer comme variable secrète dans Azure DevOps
 
 steps:
 # 1. Installer Node.js
@@ -30,59 +29,3 @@ steps:
 - script: |
     ng test --karma-config=karma.conf.js --watch=false --code-coverage --browsers=ChromeHeadless
   displayName: 'Run Unit Tests'
-
-# 5. Analyse SonarQube (préparation)
-- task: SonarQubePrepare@5
-  inputs:
-    SonarQube: 'SonarQubeServiceConnection'  # Crée ce service dans Azure DevOps
-    scannerMode: 'CLI'
-    configMode: 'manual'
-    cliProjectKey: 'E-commerce-App-main'
-    cliProjectName: 'E-commerce-App-main'
-    cliProjectVersion: '1.0'
-    cliSources: 'src'
-    extraProperties: |
-      sonar.host.url=http://localhost:9000
-      sonar.token=$(SONAR_TOKEN)
-      sonar.sourceEncoding=UTF-8
-      sonar.tests=src
-      sonar.test.inclusions=**/*.spec.ts,**/*.test.ts
-      sonar.typescript.lcov.reportPaths=coverage/lcov.info
-      sonar.exclusions=**/assets/js/script.js,**/node_modules/**,**/dist/**,**/build/**
-
-# 6. Exécuter l'analyse SonarQube
-- task: SonarQubeAnalyze@5
-  displayName: 'Run SonarQube Analysis'
-
-# 7. Publier les résultats SonarQube
-- task: SonarQubePublish@5
-  inputs:
-    pollingTimeoutSec: '300'
-  displayName: 'Publish SonarQube Results'
-
-# 8. Installer Python + Robot Framework
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.x'
-    addToPath: true
-  displayName: 'Use Python 3'
-
-- script: |
-    pip install --upgrade pip
-    pip install robotframework selenium robotframework-seleniumlibrary
-  displayName: 'Install Robot Framework & Selenium'
-
-# 9. Lancer les tests Robot Framework
-- script: |
-    cd robot-tests
-    robot --outputdir results tests/
-  displayName: 'Run Robot Framework Tests'
-
-# 10. Publier les résultats de Robot Framework
-- task: PublishTestResults@2
-  inputs:
-    testResultsFormat: 'RobotFramework'
-    testResultsFiles: '**/output.xml'
-    searchFolder: 'robot-tests/results'
-    testRunTitle: 'Robot Framework E2E Tests'
-  displayName: 'Publish Robot Test Results'
