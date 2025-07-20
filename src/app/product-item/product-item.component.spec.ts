@@ -102,9 +102,7 @@ describe('ProductItemComponent', () => {
     component.produit = undefined as any;
     cartServiceSpy.addToCart.calls.reset();
     spyOn(window, 'alert');
-
     component.addToPanier();
-
     expect(cartServiceSpy.addToCart).not.toHaveBeenCalled();
     expect(window.alert).not.toHaveBeenCalled();
   });
