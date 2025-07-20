@@ -1,85 +1,78 @@
 trigger:
-- main
+  - main
 
 pool:
-  name: 'Default'  # Self-hosted agent pool
+  vmImage: 'ubuntu-latest'
 
 variables:
-  CI: 'true'
+  SONAR_TOKEN: $(SonarQubeToken)  # À définir comme variable secrète dans Azure DevOps
 
 steps:
-# 1. Install Node.js
+
+# Étape 1 : Installer Node.js
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'
   displayName: 'Install Node.js'
 
-# 2. Install Angular CLI globally
+# Étape 2 : Installer Angular CLI et les dépendances
 - script: |
     npm install -g @angular/cli
-  displayName: 'Install Angular CLI'
-
-# 3. Install project dependencies
-- script: |
     npm install
-  displayName: 'Install dependencies'
+  displayName: 'Install Angular dependencies'
 
-# 4. Build the project first (recommended before testing)
+# Étape 3 : Build Angular
 - script: |
-    ng build --configuration=production
+    ng build --configuration production
   displayName: 'Build Angular App'
 
-# 5. Run unit tests with Karma/Jasmine
+# Étape 4 : Lancer les tests unitaires
 - script: |
-    ng test --karma-config=karma.conf.js --watch=false --code-coverage --browsers=ChromeHeadless
-  displayName: 'Run Unit Tests with Karma'
+    ng test --watch=false --browsers=ChromeHeadless --code-coverage
+  displayName: 'Run Unit Tests (Karma + Jasmine)'
 
-# 6. Publish test results (if you have test results in JUnit format)
-- task: PublishTestResults@2
-  condition: succeededOrFailed()
+# Étape 5 : Préparer l’analyse SonarQube
+- task: SonarQubePrepare@5
   inputs:
-    testResultsFormat: 'JUnit'
-    testResultsFiles: '**/TESTS-*.xml'
-    searchFolder: '$(Agent.TempDirectory)'
-    testRunTitle: 'Unit Tests'
-  displayName: 'Publish Unit Test Results'
+    SonarQube: 'SonarQubeServiceConnection'  # Configure ce service dans Azure DevOps
+    scannerMode: 'CLI'
+    configMode: 'manual'
+    cliProjectKey: 'E-commerce-App-main'
+    cliProjectName: 'E-commerce-App-main'
+    cliProjectVersion: '1.0'
+    cliSources: 'src'
+    extraProperties: |
+      sonar.host.url=http://localhost:9000
+      sonar.token=$(SONAR_TOKEN)
+      sonar.sourceEncoding=UTF-8
+      sonar.tests=src
+      sonar.test.inclusions=**/*.spec.ts,**/*.test.ts
+      sonar.typescript.lcov.reportPaths=coverage/lcov.info
+      sonar.exclusions=**/assets/js/script.js,**/node_modules/**,**/dist/**,**/build/**
 
-# 7. Publish code coverage results
-- task: PublishCodeCoverageResults@1
-  condition: succeededOrFailed()
+# Étape 6 : Analyse SonarQube
+- task: SonarQubeAnalyze@5
+  displayName: 'Run SonarQube Analysis'
+
+# Étape 7 : Publier les résultats SonarQube
+- task: SonarQubePublish@5
   inputs:
-    codeCoverageTool: 'Cobertura'
-    summaryFileLocation: 'coverage/**/cobertura-coverage.xml'
-    reportDirectory: 'coverage'
-  displayName: 'Publish Code Coverage'
+    pollingTimeoutSec: '300'
+  displayName: 'Publish SonarQube Results'
 
-# 8. Install Python and Robot Framework (only if robot-tests directory exists)
+# Étape 8 : Installer Python + Robot Framework + Selenium
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+  displayName: 'Use Python 3.x'
+
 - script: |
-    if [ -d "robot-tests" ]; then
-      echo "Robot tests directory found, installing dependencies..."
-      pip install robotframework selenium robotframework-seleniumlibrary
-    else
-      echo "No robot-tests directory found, skipping Robot Framework installation"
-    fi
-  displayName: 'Install Robot Framework (conditional)'
+    python -m pip install --upgrade pip
+    pip install robotframework selenium
+  displayName: 'Install Robot Framework & Selenium'
 
-# 9. Run Robot Framework tests (only if directory exists)
+# Étape 9 : Exécuter les tests end-to-end
 - script: |
-    if [ -d "robot-tests" ]; then
-      echo "Running Robot Framework tests..."
-      cd robot-tests
-      robot --outputdir results tests/
-    else
-      echo "No robot-tests directory found, skipping E2E tests"
-    fi
-  displayName: 'Run Robot Framework Tests (conditional)'
-
-# 10. Publish Robot Framework test results (only if they exist)
-- task: PublishTestResults@2
-  condition: and(succeededOrFailed(), exists('robot-tests/results/output.xml'))
-  inputs:
-    testResultsFormat: 'RobotFramework'
-    testResultsFiles: '**/output.xml'
-    searchFolder: 'robot-tests/results'
-    testRunTitle: 'Robot Framework E2E Tests'
-  displayName: 'Publish Robot Test Results'
+    robot tests/  # Modifie si ton répertoire de tests a un autre nom
+  displayName: 'Run Robot Framework Tests'
